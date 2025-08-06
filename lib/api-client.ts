@@ -93,11 +93,12 @@ export class APIClient {
       }
     );
   }
+  
 
   private handleError(error: any) {
     // Handle validation errors (400)
     if (error.response?.status === 400) {
-      const validationErrors = error.response.data?.errors || {};
+      const validationErrors = error.response.data?.message || {};
       const errorMessages = Object.values(validationErrors).flat();
 
       toast({

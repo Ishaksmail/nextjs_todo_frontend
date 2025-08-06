@@ -24,10 +24,16 @@ export default function RegisterPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingL, setIsLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
-  const { register } = useAuth()
+  const { register, user, isLoading } = useAuth()
+
+  useEffect(() => {
+    if (user) {
+      router.replace('/dashboard');
+    }
+  }, [user, router]);
 
   // Refs for animations
   const pageRef = useRef<HTMLDivElement>(null)
@@ -66,10 +72,10 @@ export default function RegisterPage() {
       if (cardRef.current) {
         gsapUtils.fadeIn(cardRef.current, 0.6)
       }
-      
+
       // Logo animation
       if (logoRef.current) {
-        gsap.fromTo(logoRef.current, 
+        gsap.fromTo(logoRef.current,
           { scale: 0.8, opacity: 0 },
           { scale: 1, opacity: 1, duration: 0.6, delay: 0.3, ease: "back.out(1.7)" }
         )
@@ -199,11 +205,11 @@ export default function RegisterPage() {
         if (bar) {
           gsap.to(bar, {
             scaleX: index < passwordStrength ? 1 : 0,
-            backgroundColor: index < passwordStrength 
-              ? passwordStrength <= 2 
-                ? "#f87171" 
-                : passwordStrength <= 3 
-                  ? "#fbbf24" 
+            backgroundColor: index < passwordStrength
+              ? passwordStrength <= 2
+                ? "#f87171"
+                : passwordStrength <= 3
+                  ? "#fbbf24"
                   : "#4ade80"
               : "transparent",
             duration: 0.3,
@@ -294,12 +300,23 @@ export default function RegisterPage() {
     }
   }
 
+  if (isLoading || !user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600 text-sm">Loading your workspace...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div ref={pageRef} className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center px-4">
       {/* Back to Welcome */}
       <div ref={backLinkRef} className="absolute top-6 left-6 opacity-0">
-        <Link 
-          href="/welcome" 
+        <Link
+          href="/welcome"
           className="flex items-center text-gray-600 hover:text-gray-900 transition-colors group"
           onMouseEnter={() => arrowRef.current && gsap.to(arrowRef.current, { x: -4, duration: 0.2 })}
           onMouseLeave={() => arrowRef.current && gsap.to(arrowRef.current, { x: 0, duration: 0.2 })}
@@ -312,8 +329,8 @@ export default function RegisterPage() {
       <div className="w-full max-w-md">
         {/* Brand Header */}
         <div ref={brandHeaderRef} className="text-center mb-8 opacity-0">
-          <div 
-            ref={logoRef} 
+          <div
+            ref={logoRef}
             className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center mx-auto mb-4"
             onMouseEnter={() => gsap.to(logoRef.current, { scale: 1.1, rotate: 5, duration: 0.3 })}
             onMouseLeave={() => gsap.to(logoRef.current, { scale: 1, rotate: 0, duration: 0.3 })}
@@ -329,7 +346,7 @@ export default function RegisterPage() {
         </div>
 
         <div ref={cardRef} className="opacity-0">
-          <Card 
+          <Card
             className="shadow-xl border-0 overflow-hidden"
           >
             <CardHeader className="space-y-1 pb-6">
@@ -343,7 +360,7 @@ export default function RegisterPage() {
               {/* Benefits */}
               <div ref={benefitsRef} className="bg-blue-50 rounded-lg p-4 space-y-2 opacity-0">
                 {["Free forever plan", "No credit card required", "Setup in 2 minutes"].map((benefit, index) => (
-                  <div 
+                  <div
                     key={benefit}
                     className="flex items-center text-sm text-blue-800 opacity-0"
                     ref={el => {
@@ -366,7 +383,7 @@ export default function RegisterPage() {
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-6">
-                <div 
+                <div
                   ref={el => {
                     if (el) formItemsRef.current[0] = el
                   }}
@@ -382,9 +399,8 @@ export default function RegisterPage() {
                     placeholder="Choose a username"
                     value={formData.username}
                     onChange={handleInputChange("username")}
-                    className={`h-12 transition-all duration-200 ${
-                      errors.username ? "border-red-300 focus:border-red-500" : "border-gray-200 focus:border-blue-500"
-                    }`}
+                    className={`h-12 transition-all duration-200 ${errors.username ? "border-red-300 focus:border-red-500" : "border-gray-200 focus:border-blue-500"
+                      }`}
                   />
                   {errors.username && (
                     <div className="text-red-500 text-sm">
@@ -393,7 +409,7 @@ export default function RegisterPage() {
                   )}
                 </div>
 
-                <div 
+                <div
                   ref={el => {
                     if (el) formItemsRef.current[1] = el
                   }}
@@ -409,9 +425,8 @@ export default function RegisterPage() {
                     placeholder="Enter your email"
                     value={formData.email}
                     onChange={handleInputChange("email")}
-                    className={`h-12 transition-all duration-200 ${
-                      errors.email ? "border-red-300 focus:border-red-500" : "border-gray-200 focus:border-blue-500"
-                    }`}
+                    className={`h-12 transition-all duration-200 ${errors.email ? "border-red-300 focus:border-red-500" : "border-gray-200 focus:border-blue-500"
+                      }`}
                   />
                   {errors.email && (
                     <div className="text-red-500 text-sm">
@@ -420,7 +435,7 @@ export default function RegisterPage() {
                   )}
                 </div>
 
-                <div 
+                <div
                   ref={el => {
                     if (el) formItemsRef.current[2] = el
                   }}
@@ -437,11 +452,10 @@ export default function RegisterPage() {
                       placeholder="Create a secure password"
                       value={formData.password}
                       onChange={handleInputChange("password")}
-                      className={`h-12 pr-10 transition-all duration-200 ${
-                        errors.password
-                          ? "border-red-300 focus:border-red-500"
-                          : "border-gray-200 focus:border-blue-500"
-                      }`}
+                      className={`h-12 pr-10 transition-all duration-200 ${errors.password
+                        ? "border-red-300 focus:border-red-500"
+                        : "border-gray-200 focus:border-blue-500"
+                        }`}
                     />
                     <button
                       type="button"
@@ -465,7 +479,7 @@ export default function RegisterPage() {
                         {[1, 2, 3, 4, 5].map((level) => (
                           <div
                             key={level}
-                            ref={el => {if (el) strengthBarsRef.current[level-1] = el}}
+                            ref={el => { if (el) strengthBarsRef.current[level - 1] = el }}
                             className="h-1 flex-1 rounded-full bg-gray-200 origin-left"
                             style={{ transform: 'scaleX(0)' }}
                           />
@@ -486,7 +500,7 @@ export default function RegisterPage() {
                   )}
                 </div>
 
-                <div 
+                <div
                   ref={el => {
                     if (el) formItemsRef.current[3] = el
                   }}
@@ -503,11 +517,10 @@ export default function RegisterPage() {
                       placeholder="Confirm your password"
                       value={formData.confirmPassword}
                       onChange={handleInputChange("confirmPassword")}
-                      className={`h-12 pr-10 transition-all duration-200 ${
-                        errors.confirmPassword
-                          ? "border-red-300 focus:border-red-500"
-                          : "border-gray-200 focus:border-blue-500"
-                      }`}
+                      className={`h-12 pr-10 transition-all duration-200 ${errors.confirmPassword
+                        ? "border-red-300 focus:border-red-500"
+                        : "border-gray-200 focus:border-blue-500"
+                        }`}
                     />
                     <button
                       type="button"
@@ -533,20 +546,20 @@ export default function RegisterPage() {
                 <Button
                   ref={submitButtonRef}
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoadingL}
                   className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-lg font-medium"
                   onMouseDown={(e) => gsapUtils.buttonPress(e.currentTarget)}
                   onMouseUp={(e) => gsapUtils.buttonRelease(e.currentTarget)}
                   onMouseLeave={(e) => gsapUtils.buttonRelease(e.currentTarget)}
                 >
-                  {isLoading ? "Creating account..." : "Create Account"}
+                  {isLoadingL ? "Creating account..." : "Create Account"}
                 </Button>
               </form>
 
               <div ref={footerLinksRef} className="text-center text-sm text-gray-600 opacity-0">
                 Already have an account?{" "}
-                <Link 
-                  href="/login" 
+                <Link
+                  href="/login"
                   className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
                   onMouseEnter={(e) => gsap.to(e.currentTarget, { scale: 1.05, duration: 0.2 })}
                   onMouseLeave={(e) => gsap.to(e.currentTarget, { scale: 1, duration: 0.2 })}

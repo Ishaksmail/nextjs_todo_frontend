@@ -1,8 +1,7 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useRef, useMemo, useState, useCallback } from "react"
 import { TaskCard } from "@/components/tasks/task-card"
-import { useApi } from "@/hooks/use-api"
 import type { Task } from "@/types"
 import { CalendarDays, AlertCircle, RefreshCw, Clock, Calendar } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -10,82 +9,22 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { GSAPCounter } from "@/components/ui/gsap-counter"
 import { GSAPLoadingSpinner } from "@/components/ui/gsap-loading-spinner"
 import { gsapUtils } from "@/lib/gsap-utils"
+import { useTask } from "@/components/providers/task-provider"
 
 export default function UpcomingPage() {
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const { get } = useApi()
+  const { tasks, isLoading, error, fetch_tasks } = useTask()
+  const [statsInitialized, setStatsInitialized] = useState(false)
 
-  // Refs for GSAP animations
   const pageRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLDivElement>(null)
   const statsRef = useRef<HTMLDivElement>(null)
-  const tasksGridRefs = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)]
+  const tasksGridRef = useRef<HTMLDivElement>(null)
   const emptyStateRef = useRef<HTMLDivElement>(null)
   const alertRef = useRef<HTMLDivElement>(null)
   const iconRef = useRef<HTMLDivElement>(null)
 
-  // Filter and sort tasks
-  const upcomingTasks = tasks
-    .filter((task) => {
-      if (task.is_completed || task.is_deleted || !task.due_at) return false
-      const dueDate = new Date(task.due_at)
-      return dueDate > new Date() // Only future dates
-    })
-    .sort((a, b) => {
-      if (!a.due_at || !b.due_at) return 0
-      return new Date(a.due_at).getTime() - new Date(b.due_at).getTime()
-    })
-
-  const fetchTasks = async (): Promise<void> => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const response = await get("/api/task/")
-      setTasks(response)
-    } catch (err: unknown) {
-      console.error("Failed to fetch tasks:", err)
-      setError(err instanceof Error ? err.message : "Unknown error occurred")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchTasks()
-  }, [])
-
-  // GSAP animations after content loads
-  useEffect(() => {
-    if (!isLoading) {
-      if (pageRef.current) gsapUtils.pageEnter(pageRef.current)
-      if (headerRef.current) gsapUtils.fadeIn(headerRef.current, 0.1)
-      if (error && alertRef.current) gsapUtils.fadeIn(alertRef.current, 0.2)
-
-      if (statsRef.current) {
-        const statCards = Array.from(statsRef.current.querySelectorAll<HTMLElement>('.stat-card'))
-        if (statCards.length > 0) gsapUtils.staggerIn(statCards, 0.3)
-      }
-
-      if (upcomingTasks.length === 0 && emptyStateRef.current) {
-        gsapUtils.fadeIn(emptyStateRef.current, 0.5)
-        if (iconRef.current) {
-          gsapUtils.fadeIn(iconRef.current, 0.6)
-          setTimeout(() => iconRef.current && gsapUtils.iconHover(iconRef.current), 1000)
-        }
-      }
-
-      tasksGridRefs.forEach(ref => {
-        if (ref.current) {
-          const taskCards = Array.from(ref.current.querySelectorAll<HTMLElement>('.task-card'))
-          if (taskCards.length > 0) gsapUtils.staggerIn(taskCards, 0.5)
-        }
-      })
-    }
-  }, [isLoading, error, tasks])
-
-  const getTasksByPeriod = () => {
+  // حساب المهام حسب الفترات الزمنية
+  const { thisWeekTasks, nextWeekTasks, laterTasks } = useMemo(() => {
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const endOfThisWeek = new Date(today)
@@ -95,43 +34,94 @@ export default function UpcomingPage() {
     const endOfNextWeek = new Date(endOfThisWeek)
     endOfNextWeek.setDate(endOfThisWeek.getDate() + 7)
 
+    const upcomingTasks = tasks
+      .filter(task => !task.is_completed && !task.is_deleted && task.due_at && new Date(task.due_at) > now)
+      .sort((a, b) => new Date(a.due_at!).getTime() - new Date(b.due_at!).getTime())
+
     return {
-      thisWeek: upcomingTasks.filter(task => task.due_at && new Date(task.due_at) <= endOfThisWeek),
-      nextWeek: upcomingTasks.filter(task => task.due_at && new Date(task.due_at) > endOfThisWeek && new Date(task.due_at) <= endOfNextWeek),
-      later: upcomingTasks.filter(task => task.due_at && new Date(task.due_at) > endOfNextWeek),
+      thisWeekTasks: upcomingTasks.filter(task => new Date(task.due_at!) <= endOfThisWeek),
+      nextWeekTasks: upcomingTasks.filter(task => new Date(task.due_at!) > endOfThisWeek && new Date(task.due_at!) <= endOfNextWeek),
+      laterTasks: upcomingTasks.filter(task => new Date(task.due_at!) > endOfNextWeek),
     }
-  }
+  }, [tasks])
 
-  const taskPeriods = getTasksByPeriod()
+  const fetchTasks = useCallback(async () => {
+    try {
+      await fetch_tasks()
+    } catch (err) {
+      console.error("Failed to fetch tasks:", err)
+    }
+  }, [fetch_tasks])
 
-  const handleRetry = () => fetchTasks()
+  // تشغيل الأنيميشن مرة واحدة
+  useEffect(() => {
+    if (!isLoading && !statsInitialized && !error) {
+      if (statsRef.current) {
+        const statCards = statsRef.current.querySelectorAll('.stat-card')
+        gsapUtils.staggerIn(Array.from(statCards) as HTMLElement[], 0.3)
+        setStatsInitialized(true)
+      }
+      if (pageRef.current) gsapUtils.pageEnter(pageRef.current)
+      if (headerRef.current) gsapUtils.fadeIn(headerRef.current, 0.1)
+    }
+  }, [isLoading, statsInitialized, error])
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <GSAPLoadingSpinner size="lg" className="mx-auto mb-4" />
-          <p className="text-gray-600 text-sm">Loading upcoming tasks...</p>
-        </div>
-      </div>
-    )
-  }
+  // إظهار رسالة الخطأ
+  useEffect(() => {
+    if (error && alertRef.current) {
+      gsapUtils.fadeIn(alertRef.current, 0.2)
+    }
+  }, [error])
 
-  const statsData = [
-    { icon: CalendarDays, label: "Upcoming Tasks", value: upcomingTasks.length, color: "blue" },
-    { icon: Clock, label: "This Week", value: taskPeriods.thisWeek.length, color: "orange" },
-    { icon: Calendar, label: "Next Week", value: taskPeriods.nextWeek.length, color: "purple" },
-  ]
+  // أنيميشن للمهام
+  useEffect(() => {
+    if (!isLoading && !error) {
+      if (thisWeekTasks.length === 0 && nextWeekTasks.length === 0 && laterTasks.length === 0 && emptyStateRef.current) {
+        gsapUtils.fadeIn(emptyStateRef.current, 0.1)
+        if (iconRef.current) {
+          gsapUtils.fadeIn(iconRef.current, 0.1)
+          setTimeout(() => gsapUtils.iconHover(iconRef.current!), 200)
+        }
+      } else if (tasksGridRef.current) {
+        const taskCards = tasksGridRef.current.querySelectorAll('.task-card')
+        gsapUtils.staggerIn(Array.from(taskCards) as HTMLElement[], 0.1)
+      }
+    }
+  }, [isLoading, thisWeekTasks, nextWeekTasks, laterTasks, error])
+
+  const statsData = useMemo(() => [
+    {
+      icon: CalendarDays,
+      label: "Upcoming Tasks",
+      value: thisWeekTasks.length + nextWeekTasks.length + laterTasks.length,
+      color: "blue",
+    },
+    {
+      icon: Clock,
+      label: "This Week",
+      value: thisWeekTasks.length,
+      color: "orange",
+    },
+    {
+      icon: Calendar,
+      label: "Next Week",
+      value: nextWeekTasks.length,
+      color: "purple",
+    },
+  ], [thisWeekTasks, nextWeekTasks, laterTasks])
+
+  const hasTasks = thisWeekTasks.length > 0 || nextWeekTasks.length > 0 || laterTasks.length > 0
 
   return (
     <div ref={pageRef} className="space-y-6 opacity-0">
+      {/* رسالة الخطأ */}
       {error && (
         <div ref={alertRef} className="opacity-0">
-          <Alert className="border-red-200 bg-red-50">
-            <AlertCircle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-800">
-              {error}
-              <Button variant="outline" size="sm" onClick={handleRetry} className="ml-2 bg-transparent">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="flex items-center">
+              {typeof error === 'string' ? error : 'An unexpected error occurred'}
+              <Button variant="ghost" size="sm" onClick={fetchTasks} className="ml-2 hover:bg-transparent">
                 <RefreshCw className="h-4 w-4 mr-1" />
                 Retry
               </Button>
@@ -140,7 +130,7 @@ export default function UpcomingPage() {
         </div>
       )}
 
-      {/* Page Header */}
+      {/* العنوان */}
       <div ref={headerRef} className="mb-6 opacity-0">
         <div className="flex items-center mb-2">
           <div
@@ -155,7 +145,7 @@ export default function UpcomingPage() {
         <p className="text-gray-600 text-sm">Tasks with upcoming due dates</p>
       </div>
 
-      {/* Stats */}
+      {/* الإحصائيات */}
       <div ref={statsRef} className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         {statsData.map((stat) => (
           <div
@@ -183,80 +173,70 @@ export default function UpcomingPage() {
         ))}
       </div>
 
-      {/* Tasks Grid or Empty State */}
-      {upcomingTasks.length === 0 ? (
-        <div ref={emptyStateRef} className="text-center py-16 opacity-0">
-          <div
-            ref={iconRef}
-            className="opacity-0 cursor-pointer inline-block"
-            onMouseEnter={(e) => gsapUtils.iconHover(e.currentTarget as HTMLElement)}
-            onMouseLeave={(e) => gsapUtils.iconHoverOut(e.currentTarget as HTMLElement)}
-          >
-            <CalendarDays className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+      {/* عرض المهام */}
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <GSAPLoadingSpinner size="lg" className="mx-auto mb-4" />
+            <p className="text-gray-600 text-sm">{error ? 'Retrying...' : 'Loading your tasks...'}</p>
           </div>
-          <div className="text-gray-500 text-lg mb-2">No upcoming tasks</div>
-          <p className="text-gray-400 text-sm">
-            Tasks with due dates will appear here
-          </p>
         </div>
       ) : (
-        <div className="space-y-8">
-          {/* This Week */}
-          {taskPeriods.thisWeek.length > 0 && (
-            <div>
-              <div className="flex items-center mb-4">
-                <div className="cursor-pointer mr-2">
-                  <Clock className="h-5 w-5 text-orange-600" />
+        <>
+          {!hasTasks ? (
+            <div ref={emptyStateRef} className="text-center py-16 opacity-0">
+              <div
+                ref={iconRef}
+                className="opacity-0 cursor-pointer inline-block"
+                onMouseEnter={(e) => gsapUtils.iconHover(e.currentTarget as HTMLElement)}
+                onMouseLeave={(e) => gsapUtils.iconHoverOut(e.currentTarget as HTMLElement)}
+              >
+                <CalendarDays className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              </div>
+              <div className="text-gray-500 text-lg mb-2">No upcoming tasks</div>
+              <p className="text-gray-400 text-sm">Tasks with due dates will appear here</p>
+            </div>
+          ) : (
+            <div ref={tasksGridRef} className="space-y-6">
+              {thisWeekTasks.length > 0 && (
+                <div className="space-y-4">
+                  <h2 className="text-lg font-medium text-gray-900 flex items-center">
+                    <Clock className="h-5 w-5 text-orange-600 mr-2" /> This Week
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {thisWeekTasks.map((task, index) => (
+                      <TaskCard key={task.id} task={task} index={index} />
+                    ))}
+                  </div>
                 </div>
-                <h2 className="text-lg font-semibold text-gray-900">This Week</h2>
-                <span className="ml-2 px-2 py-1 bg-orange-100 text-orange-700 text-xs rounded-full font-medium">
-                  <GSAPCounter value={taskPeriods.thisWeek.length} />
-                </span>
-              </div>
-              <div ref={tasksGridRefs[0]} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {taskPeriods.thisWeek.map((task, index) => (
-                  <TaskCard key={task.id} task={task} onUpdate={fetchTasks} isDemo={false} index={index} />
-                ))}
-              </div>
+              )}
+              {nextWeekTasks.length > 0 && (
+                <div className="space-y-4">
+                  <h2 className="text-lg font-medium text-gray-900 flex items-center">
+                    <Calendar className="h-5 w-5 text-purple-600 mr-2" /> Next Week
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {nextWeekTasks.map((task, index) => (
+                      <TaskCard key={task.id} task={task} index={index} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {laterTasks.length > 0 && (
+                <div className="space-y-4">
+                  <h2 className="text-lg font-medium text-gray-900 flex items-center">
+                    <CalendarDays className="h-5 w-5 text-gray-600 mr-2" /> Later
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {laterTasks.map((task, index) => (
+                      <TaskCard key={task.id} task={task} index={index} />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
-
-          {/* Next Week */}
-          {taskPeriods.nextWeek.length > 0 && (
-            <div>
-              <div className="flex items-center mb-4">
-                <Calendar className="h-5 w-5 text-purple-600" />
-                <h2 className="text-lg font-semibold text-gray-900 ml-2">Next Week</h2>
-                <span className="ml-2 px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">
-                  <GSAPCounter value={taskPeriods.nextWeek.length} />
-                </span>
-              </div>
-              <div ref={tasksGridRefs[1]} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {taskPeriods.nextWeek.map((task, index) => (
-                  <TaskCard key={task.id} task={task} onUpdate={fetchTasks} isDemo={false} index={index} />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Later */}
-          {taskPeriods.later.length > 0 && (
-            <div>
-              <div className="flex items-center mb-4">
-                <CalendarDays className="h-5 w-5 text-gray-600" />
-                <h2 className="text-lg font-semibold text-gray-900 ml-2">Later</h2>
-                <span className="ml-2 px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full font-medium">
-                  <GSAPCounter value={taskPeriods.later.length} />
-                </span>
-              </div>
-              <div ref={tasksGridRefs[2]} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {taskPeriods.later.map((task, index) => (
-                  <TaskCard key={task.id} task={task} onUpdate={fetchTasks} isDemo={false} index={index} />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        </>
       )}
     </div>
   )

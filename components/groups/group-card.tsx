@@ -12,24 +12,15 @@ import { AnimatedCounter } from "@/components/ui/animated-counter"
 interface GroupCardProps {
   group: Group
   onUpdate: () => void
-  isDemo?: boolean
   index?: number
 }
 
-export function GroupCard({ group, onUpdate, isDemo = false, index = 0 }: GroupCardProps) {
-  const [isLoading, setIsLoading] = useState(false)
+export function GroupCard({ group, onUpdate, index = 0 }: GroupCardProps) {
   const [isDeleting, setIsDeleting] = useState(false)
   const { del } = useApi()
   const { toast } = useToast()
 
   const handleDelete = async () => {
-    if (isDemo) {
-      toast({
-        title: "Demo Mode",
-        description: "Connect to your backend to enable full functionality.",
-      })
-      return
-    }
 
     setIsDeleting(true)
     try {

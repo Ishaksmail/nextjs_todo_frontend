@@ -3,6 +3,11 @@ import { gsap } from "gsap"
 // GSAP Animation Utilities
 export const gsapUtils = {
 
+  shake: (element: HTMLElement) => {
+    // Your shake implementation
+    gsap.to(element, { x: 10, duration: 0.1, repeat: 5, yoyo: true });
+  },
+
   slideFadeToggle: (element: HTMLElement, show: boolean) => {
     if (show) {
       gsap.fromTo(element,
@@ -195,5 +200,7 @@ export const gsapUtils = {
       ease: "power2.out"
     })
   }
+
+  
 }
 

@@ -21,10 +21,17 @@ export default function LoginPage() {
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingL, setIsLoading] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
-  const { login } = useAuth()
+  const { login, user, isLoading } = useAuth()
+
+  useEffect(() => {
+    if (user) {
+      router.replace('/dashboard');
+    }
+  }, [user, router]);
+
 
   // Refs for animations
   const pageRef = useRef<HTMLDivElement>(null)
@@ -38,6 +45,9 @@ export default function LoginPage() {
   const submitButtonRef = useRef<HTMLButtonElement>(null)
   const footerLinksRef = useRef<HTMLDivElement>(null)
   const formItemsRef = useRef<(HTMLDivElement | null)[]>([])
+
+
+
 
   useEffect(() => {
     // Create a GSAP context to safely manage animations
@@ -58,6 +68,10 @@ export default function LoginPage() {
       if (cardRef.current) {
         gsapUtils.fadeIn(cardRef.current, 0.6)
       }
+
+
+
+
 
 
       if (logoRef.current) {
@@ -176,9 +190,20 @@ export default function LoginPage() {
     }
   }
 
+  if (isLoading || !user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600 text-sm">Loading your workspace...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div ref={pageRef} className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center px-4">
-      
+
       <div ref={backLinkRef} className="absolute top-6 left-6 opacity-0">
         <Link
           href="/welcome"
@@ -284,13 +309,13 @@ export default function LoginPage() {
                 <Button
                   ref={submitButtonRef}
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoadingL}
                   className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-lg font-medium"
                   onMouseDown={(e) => gsapUtils.buttonPress(e.currentTarget)}
                   onMouseUp={(e) => gsapUtils.buttonRelease(e.currentTarget)}
                   onMouseLeave={(e) => gsapUtils.buttonRelease(e.currentTarget)}
                 >
-                  {isLoading ? "Signing in..." : "Sign In"}
+                  {isLoadingL ? "Signing in..." : "Sign In"}
                 </Button>
 
               </form>

@@ -7,7 +7,9 @@ import { Header } from "@/components/layout/header"
 import { FloatingActionButton } from "@/components/ui/floating-action-button"
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { SidebarProvider} from "@/components/ui/sidebar"
+import { SidebarProvider } from "@/components/ui/sidebar"
+import { TaskProvider } from "@/components/providers/task-provider"
+import { GroupProvider } from "@/components/providers/group-provider"
 
 export default function DashboardLayout({
   children,
@@ -15,6 +17,7 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const { user, isLoading } = useAuth()
+
 
   if (isLoading || !user) {
     return (
@@ -29,16 +32,20 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="flex">
-        <SidebarProvider>
-          <AppSidebar />
-          <div className="flex-1 flex flex-col min-h-screen">
-            <Header />
-            <main className="flex-1 p-6 overflow-auto">{children}</main>
+      <TaskProvider>
+        <GroupProvider>
+          <div className="flex">
+            <SidebarProvider>
+              <AppSidebar />
+              <div className="flex-1 flex flex-col min-h-screen">
+                <Header />
+                <main className="flex-1 p-6 overflow-auto">{children}</main>
+              </div>
+            </SidebarProvider>
           </div>
-        </SidebarProvider>
-      </div>
-      <FloatingActionButton />
+          <FloatingActionButton />
+        </GroupProvider>
+      </TaskProvider>
     </div>
   )
 }

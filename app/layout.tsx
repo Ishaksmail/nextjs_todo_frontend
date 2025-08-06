@@ -10,7 +10,6 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Climdo - Smart Task Management",
   description: "The most intuitive task management platform for productive teams",
-    generator: 'v0.dev'
 }
 
 export default function RootLayout({

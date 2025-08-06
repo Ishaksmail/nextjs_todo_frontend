@@ -12,13 +12,24 @@ import { useApi } from "@/hooks/use-api"
 import { Sparkles, ArrowLeft, Mail } from "lucide-react"
 import { gsapUtils } from "@/lib/gsap-utils"
 import gsap from "gsap"
+import { useAuth } from "@/components/providers/auth-provider"
+import { useRouter } from "next/navigation"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingL, setIsLoading] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const { toast } = useToast()
   const { post } = useApi()
+  const router = useRouter()
+
+  const { user,isLoading } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      router.replace('/dashboard');
+    }
+  }, [user, router]);
 
   // Refs for animations
   const pageRef = useRef<HTMLDivElement>(null)
@@ -112,6 +123,17 @@ export default function ForgotPasswordPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  if (isLoading || !user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600 text-sm">Loading your workspace...</p>
+        </div>
+      </div>
+    )
   }
 
   if (isSubmitted) {
@@ -208,12 +230,12 @@ export default function ForgotPasswordPage() {
                 ref={submitButtonRef}
                 type="submit"
                 className="w-full h-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-lg font-medium"
-                disabled={isLoading}
+                disabled={isLoadingL}
                 onMouseDown={(e) => gsapUtils.buttonPress(e.currentTarget)}
                 onMouseUp={(e) => gsapUtils.buttonRelease(e.currentTarget)}
                 onMouseLeave={(e) => gsapUtils.buttonRelease(e.currentTarget)}
               >
-                {isLoading ? "Sending..." : "Send reset instructions"}
+                {isLoadingL ? "Sending..." : "Send reset instructions"}
               </Button>
             </form>
 

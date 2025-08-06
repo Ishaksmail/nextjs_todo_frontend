@@ -1,8 +1,7 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useMemo, useCallback } from "react"
 import { TaskCard } from "@/components/tasks/task-card"
-import { useApi } from "@/hooks/use-api"
 import type { Task } from "@/types"
 import { Calendar, CheckCircle, Clock, AlertCircle, RefreshCw } from 'lucide-react'
 import { Button } from "@/components/ui/button"
@@ -10,125 +9,100 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { GSAPCounter } from "@/components/ui/gsap-counter"
 import { GSAPLoadingSpinner } from "@/components/ui/gsap-loading-spinner"
 import { gsapUtils } from "@/lib/gsap-utils"
-
+import { useTask } from "@/components/providers/task-provider"
 
 export default function DashboardPage() {
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const { get } = useApi()
+  const { tasks, isLoading, error, fetch_tasks } = useTask();
+  const [statsInitialized, setStatsInitialized] = useState(false);
 
-  // Refs for GSAP animations
-  const pageRef = useRef<HTMLDivElement>(null)
-  const headerRef = useRef<HTMLDivElement>(null)
-  const statsRef = useRef<HTMLDivElement>(null)
-  const tasksGridRef = useRef<HTMLDivElement>(null)
-  const emptyStateRef = useRef<HTMLDivElement>(null)
-  const alertRef = useRef<HTMLDivElement>(null)
-  const iconRef = useRef<HTMLDivElement>(null)
+  const pageRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const statsRef = useRef<HTMLDivElement>(null);
+  const tasksGridRef = useRef<HTMLDivElement>(null);
+  const emptyStateRef = useRef<HTMLDivElement>(null);
+  const alertRef = useRef<HTMLDivElement>(null);
+  const iconRef = useRef<HTMLDivElement>(null);
 
-  const fetchTasks = async () => {
-    setIsLoading(true)
-    setError(null)
+  // Memoized task filters to prevent unnecessary recalculations
+  const { todayTasks, completedToday, noDateTasks } = useMemo(() => {
+    const today = new Date().toDateString();
 
-    try {
-      const response = await get("/api/task/")
-      const today = new Date().toDateString()
-      const filteredTasks = response.filter((task: Task) => {
-        const dueDate = task.due_at ? new Date(task.due_at).toDateString() : ""
-        return (dueDate === today) && !task.is_completed && !task.is_deleted
+    return {
+      todayTasks: tasks.filter((task) => {
+        const dueDate = task.due_at ? new Date(task.due_at).toDateString() : "";
+        return (dueDate === today) && !task.is_completed && !task.is_deleted;
+      }),
+      completedToday: tasks.filter((task) => {
+        const completedDate = task.completed_at ? new Date(task.completed_at).toDateString() : "";
+        return completedDate === today && task.is_completed && !task.is_deleted;
+      }),
+      noDateTasks: tasks.filter((task) => {
+        return !task.due_at && !task.is_completed && !task.is_deleted;
       })
-      
-      setTasks(filteredTasks)
-    } catch (error) {
-      console.error("Failed to fetch tasks:", error)
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
-      setError(errorMessage)
+    };
+  }, [tasks]);
 
-    } finally {
-      setIsLoading(false)
+  const fetchTasks = useCallback(async () => {
+    try {
+      await fetch_tasks();
+    } catch (err) {
+      console.error("Failed to fetch tasks:", err);
     }
-  }
+  }, [fetch_tasks]);
 
+
+  // Initialize animations only once for stats
   useEffect(() => {
-    fetchTasks()
-  }, [])
-
-  // GSAP animations after content loads
-  useEffect(() => {
-    if (!isLoading) {
-      // Animate page entrance
-      if (pageRef.current) {
-        gsapUtils.pageEnter(pageRef.current)
-      }
-
-      // Animate header
-      if (headerRef.current) {
-        gsapUtils.fadeIn(headerRef.current, 0.1)
-      }
-
-      // Animate alert if present
-      if (error && alertRef.current) {
-        gsapUtils.fadeIn(alertRef.current, 0.2)
-      }
-
-      // Animate stats
+    if (!isLoading && !statsInitialized && !error) {
       if (statsRef.current) {
         const statCards = statsRef.current.querySelectorAll('.stat-card');
         gsapUtils.staggerIn(Array.from(statCards) as HTMLElement[], 0.3);
+        setStatsInitialized(true);
       }
-
-      // Animate tasks grid or empty state
-      if (todayTasks.length === 0 && emptyStateRef.current) {
-        gsapUtils.fadeIn(emptyStateRef.current, 0.5)
-
-        // Animate floating icon
-        if (iconRef.current) {
-          gsapUtils.fadeIn(iconRef.current, 0.6)
-          // Add floating animation
-          setTimeout(() => {
-            if (iconRef.current) {
-              gsapUtils.iconHover(iconRef.current)
-            }
-          }, 1000)
-        }
-      } else if (tasksGridRef.current) {
-
-        const taskCards = tasksGridRef.current.querySelectorAll('.task-card');
-        gsapUtils.staggerIn(Array.from(taskCards) as HTMLElement[], 0.5);
+      if (pageRef.current) {
+        gsapUtils.pageEnter(pageRef.current);
+      }
+      if (headerRef.current) {
+        gsapUtils.fadeIn(headerRef.current, 0.1);
       }
     }
-  }, [isLoading, error, tasks])
+  }, [isLoading, statsInitialized, error]);
 
-  const todayTasks = tasks.filter((task) => {
-    const today = new Date().toDateString()
-    const taskDate = task.created_at ? new Date(task.created_at).toDateString() : ""
-    const dueDate = task.due_at ? new Date(task.due_at).toDateString() : ""
-    return (taskDate === today || dueDate === today) && !task.is_completed && !task.is_deleted
-  })
+  // Error animation handling
+  useEffect(() => {
+    if (error && alertRef.current) {
+      gsapUtils.fadeIn(alertRef.current, 0.2);
+    }
+  }, [error]);
 
-  const completedToday = tasks.filter((task) => {
-    const today = new Date().toDateString()
-    const completedDate = task.completed_at ? new Date(task.completed_at).toDateString() : ""
-    return completedDate === today && task.is_completed && !task.is_deleted
-  })
+  // Tasks grid animations
+  useEffect(() => {
+    if (!isLoading && !error) {
+      if (todayTasks.length === 0 && noDateTasks.length === 0 && completedToday.length === 0 && emptyStateRef.current) {
+        gsapUtils.fadeIn(emptyStateRef.current, 0.1);
 
-  const handleRetry = () => {
-    fetchTasks()
-  }
+        if (iconRef.current) {
+          gsapUtils.fadeIn(iconRef.current, 0.1);
+          setTimeout(() => {
+            if (iconRef.current) {
+              gsapUtils.iconHover(iconRef.current);
+            }
+          });
+        }
+      } else if (tasksGridRef.current) {
+        const taskCards = tasksGridRef.current.querySelectorAll('.task-card');
+        gsapUtils.staggerIn(Array.from(taskCards) as HTMLElement[], 0.1);
+      }
+    }
+  }, [isLoading, todayTasks, noDateTasks, completedToday, error]);
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <GSAPLoadingSpinner size="lg" className="mx-auto mb-4" />
-          <p className="text-gray-600 text-sm">Loading your tasks...</p>
-        </div>
-      </div>
-    )
-  }
+  const handleRetry = useCallback(() => {
+   
+      fetchTasks();
+    
+  }, [fetchTasks]);
 
-  const statsData = [
+  const statsData = useMemo(() => [
     {
       icon: Clock,
       label: "Today's Tasks",
@@ -151,18 +125,25 @@ export default function DashboardPage() {
       color: "purple",
       suffix: "%",
     },
-  ]
+  ], [todayTasks, completedToday]);
+
+  const hasTasks = todayTasks.length > 0 || noDateTasks.length > 0 || completedToday.length > 0;
 
   return (
     <div ref={pageRef} className="space-y-6 opacity-0">
       {/* Error Alert */}
       {error && (
         <div ref={alertRef} className="opacity-0">
-          <Alert className="border-red-200 bg-red-50">
-            <AlertCircle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-800">
-              {error}
-              <Button variant="outline" size="sm" onClick={handleRetry} className="ml-2 bg-transparent">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="flex items-center">
+              {typeof error === 'string' ? error : 'An unexpected error occurred'}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleRetry}
+                className="ml-2 hover:bg-transparent"
+              >
                 <RefreshCw className="h-4 w-4 mr-1" />
                 Retry
               </Button>
@@ -186,9 +167,9 @@ export default function DashboardPage() {
         <p className="text-gray-600 text-sm">Focus on what matters most today</p>
       </div>
 
-      {/* Stats */}
+      {/* Stats - Only loaded once and not re-animated */}
       <div ref={statsRef} className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        {statsData.map((stat, index) => (
+        {statsData.map((stat) => (
           <div
             key={stat.label}
             className="stat-card bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-300 opacity-0 cursor-pointer"
@@ -215,34 +196,73 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Tasks Grid or Empty State */}
-      {todayTasks.length === 0 ? (
-        <div ref={emptyStateRef} className="text-center py-16 opacity-0">
-          <div
-            ref={iconRef}
-            className="opacity-0 cursor-pointer inline-block"
-            onMouseEnter={(e) => gsapUtils.iconHover(e.currentTarget as HTMLElement)}
-            onMouseLeave={(e) => gsapUtils.iconHoverOut(e.currentTarget as HTMLElement)}
-          >
-            <Calendar className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+      {isLoading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <GSAPLoadingSpinner size="lg" className="mx-auto mb-4" />
+            <p className="text-gray-600 text-sm">
+              {error ? 'Retrying...' : 'Loading your tasks...'}
+            </p>
           </div>
-          <div className="text-gray-500 text-lg mb-2">No tasks for today</div>
-          <p className="text-gray-400 text-sm">
-            Click the + button to add your first task
-          </p>
         </div>
       ) : (
-        <div ref={tasksGridRef} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {todayTasks.map((task, index) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              onUpdate={() => fetchTasks()}
-              index={index}
-            />
-          ))}
-        </div>
+        <>
+          {!hasTasks ? (
+            <div ref={emptyStateRef} className="text-center py-16 opacity-0">
+              <div
+                ref={iconRef}
+                className="opacity-0 cursor-pointer inline-block"
+                onMouseEnter={(e) => gsapUtils.iconHover(e.currentTarget as HTMLElement)}
+                onMouseLeave={(e) => gsapUtils.iconHoverOut(e.currentTarget as HTMLElement)}
+              >
+                <Calendar className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              </div>
+              <div className="text-gray-500 text-lg mb-2">No tasks for today</div>
+              <p className="text-gray-400 text-sm">
+                Click the + button to add your first task
+              </p>
+            </div>
+          ) : (
+            <div ref={tasksGridRef} className="space-y-6">
+              {/* Today's Tasks Section */}
+              {todayTasks.length > 0 && (
+                <div className="space-y-4">
+                  <h2 className="text-lg font-medium text-gray-900">Due Today</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {todayTasks.map((task, index) => (
+                      <TaskCard key={task.id} task={task} index={index} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* No Date Tasks Section */}
+              {noDateTasks.length > 0 && (
+                <div className="space-y-4">
+                  <h2 className="text-lg font-medium text-gray-900">No Due Date</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {noDateTasks.map((task, index) => (
+                      <TaskCard key={task.id} task={task} index={index} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Completed Today Section */}
+              {completedToday.length > 0 && (
+                <div className="space-y-4">
+                  <h2 className="text-lg font-medium text-gray-900">Completed Today</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {completedToday.map((task, index) => (
+                      <TaskCard key={task.id} task={task} index={index} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
-  )
+  );
 }
