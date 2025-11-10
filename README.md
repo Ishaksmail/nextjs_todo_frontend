@@ -103,8 +103,4 @@ Contributions are welcome!
 * Create a feature branch: `feature/your-feature-name`
 * Ensure code quality and proper testing before submitting a **Pull Request**.
 
----
 
-## 📜 **License**
-
-This project is licensed under the [MIT License](LICENSE).
